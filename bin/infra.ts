@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import * as cdk from "aws-cdk-lib";
 import dotenv from "dotenv";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
 // import { InfraStack } from "../lib/infra-stack";
 import { S3Stack } from "../lib/s3-stack";
 import { VpcStack } from "../lib/vpc-stack";
-import { EscStack } from "../lib/esc-stack";
+import { AuroraStack } from "../lib/aurora-stack";
+import { EcsStack } from "../lib/ecs-stack";
 
 dotenv.config();
 
@@ -15,29 +17,51 @@ const env = {
   account: process.env.AWS_ACCOUNT_ID,
   region: process.env.AWS_REGION,
 };
-// console.log(`env: ${JSON.stringify(env)}`);
-// console.log(`environment: ${environment}`);
 
-// define the stack
+// -------------- Create stacks ------------------
+
+// S3
 const s3Stack = new S3Stack(app, "S3Stack", {
   env: env,
+
   environment: environment,
 });
 
-const vpcStack = new VpcStack(app, "VpcStack", {
-  env: env,
-  environment: environment,
-});
-
-// const escStack = new EscStack(app, "EscStack", {
+// VPC
+// const vpcStack = new VpcStack(app, "VpcStack", {
 //   env: env,
 //   environment: environment,
-//   vpcId: vpcStack.vpc.vpcId,
-//   ecrRepositoryName: process.env.ECR_REPOSITORY_NAME ?? "",
-//   // acmCertificateArn: process.env.ACM_CERTIFICATE_ARN ?? "",
-//   // secretArn: process.env.SECRET_ARN ?? "",
 // });
 
+// Import existing VPC
+const vpc = ec2.Vpc.fromLookup(s3Stack, "ExistingVPC", {
+  vpcId: process.env.VPC_ID,
+});
+
+// Aurora
+const auroraStack = new AuroraStack(app, "AuroraStack", {
+  env: env,
+  environment: environment,
+  vpc: vpc,
+  databaseName: process.env.DATABASE_NAME ?? "eduka3ddb",
+  databaseUsername: process.env.DATABASE_USERNAME ?? "admin",
+  backupRetentionDays: parseInt(process.env.BACKUP_RETENTION_DAYS ?? "7"),
+});
+
+// ECS
+const ecsStack = new EcsStack(app, "EcsStack", {
+  env: env,
+  environment: environment,
+  vpc: vpc,
+  bucketName: s3Stack.bucket.bucketName,
+  cdnDomainName: s3Stack.distribution.domainName,
+  ecrRepositoryName: process.env.ECR_REPOSITORY_NAME ?? "eduka3d",
+  acmCertificateArn: process.env.ACM_CERTIFICATE_ARN ?? "",
+  dbSecret: auroraStack.secret,
+  parameterStorePath: `/eduka3d/${environment}`,
+});
+
+ecsStack.addDependency(auroraStack);
 app.synth();
 
 // new InfraStack(app, "InfraStack", {
