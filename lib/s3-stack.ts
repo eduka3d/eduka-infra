@@ -4,6 +4,7 @@ import { Construct } from "constructs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as cloudfront_origins from "aws-cdk-lib/aws-cloudfront-origins";
+import * as iam from "aws-cdk-lib/aws-iam";
 
 interface S3StackProps extends cdk.StackProps {
   environment: string;
@@ -22,9 +23,14 @@ export class S3Stack extends cdk.Stack {
 
     this.bucket = new s3.Bucket(this, "eduka3d-bucket", {
       bucketName: bucketName,
-      //   blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      //   accessControl: s3.BucketAccessControl.PRIVATE,
-      //   enforceSSL: true,
+      cors: [
+        {
+          allowedHeaders: ["*"],
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+          allowedOrigins: ["*"],
+          exposedHeaders: ["Access-Control-Allow-Origin"],
+        },
+      ],
 
       removalPolicy:
         env === "prod" ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
@@ -42,10 +48,25 @@ export class S3Stack extends cdk.Stack {
           ),
           viewerProtocolPolicy:
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+          originRequestPolicy:
+            cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
         },
         defaultRootObject: "index.html",
       }
     );
+
+    // create iam policy for bucket
+    // const bucketPolicy = new iam.Policy(this, "BucketPolicy", {
+    //   policyName: `eduka3d-${env}-bucket-policy`,
+    //   statements: [
+    //     new iam.PolicyStatement({
+    //       actions: ["s3:GetObject"],
+    //       resources: [this.bucket.arnForObjects("*")],
+    //       principals: [new iam.AnyPrincipal()],
+    //     }),
+    //   ],
+    // });
 
     // Output
     new cdk.CfnOutput(this, "BucketName", {
@@ -57,5 +78,10 @@ export class S3Stack extends cdk.Stack {
       value: this.distribution.domainName,
       exportName: `${env}-DistributionDomainName`,
     });
+
+    // new cdk.CfnOutput(this, "PolicyName", {
+    //   value: bucketPolicy.policyName,
+    //   exportName: `${env}-BucketPolicy`,
+    // });
   }
 }
