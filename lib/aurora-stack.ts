@@ -9,7 +9,7 @@ import * as logs from "aws-cdk-lib/aws-logs";
 
 interface AuroraStackProps extends cdk.StackProps {
   environment: string;
-  vpc: ec2.Vpc;
+  vpc: ec2.IVpc;
   databaseName?: string;
   databaseUsername?: string;
   backupRetentionDays?: number;
@@ -61,7 +61,8 @@ export class AuroraStack extends cdk.Stack {
       // readers: [rds.ClusterInstance.serverlessV2("reader")],
       vpc: props.vpc,
       vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        // public subnet is preferred for cost savings. as it doesn't require NAT gateway.
+        subnetType: ec2.SubnetType.PUBLIC,
       },
       securityGroups: [auroraSecurityGroup],
       storageEncrypted: env === "prod" ? true : false,
@@ -110,15 +111,6 @@ export class AuroraStack extends cdk.Stack {
       stringValue: databaseUsername,
       description: "Aurora Serverless database username",
     });
-
-    // Export database password to secure Parameter Store (SecureString)
-    // Note: The secret is managed by RDS, so we reference it
-    // new ssm.StringParameter(this, "DatabasePasswordParameter", {
-    //   parameterName: `/eduka3d/${env}/DATABASE_PASSWORD`,
-    //   stringValue: this.secret.secretValueFromJson("password").toString(),
-    //   // type: ssm.ParameterType.SECURE_STRING,
-    //   description: "Aurora Serverless database password",
-    // });
 
     // Exports for CloudFormation
     new cdk.CfnOutput(this, "ClusterEndpoint", {
