@@ -156,30 +156,7 @@ export class EcsStack extends cdk.Stack {
     fargateService.targetGroup.configureHealthCheck({
       path: "/health",
       port: "8000",
-      protocol: elbv2.Protocol.HTTP,
-      interval: cdk.Duration.seconds(60), // Check every 60 seconds (more relaxed)
-      timeout: cdk.Duration.seconds(10),
-      healthyThresholdCount: 3, // Require 3 successful checks
-      unhealthyThresholdCount: 5, // Allow 5 failures before marking unhealthy
     });
-
-    // Set health check grace period for ECS tasks to initialize (60 seconds)
-    fargateService.service.node.tryRemoveChild("ServiceTaskCountTarget");
-    const serviceCfn = fargateService.service.node
-      .defaultChild as ecs.CfnService;
-    serviceCfn.healthCheckGracePeriodSeconds = 60;
-
-    // Add deregistration delay for graceful shutdown
-    fargateService.targetGroup.setAttribute(
-      "deregistration_delay.timeout_seconds",
-      "30"
-    );
-
-    // Add startup grace period (stickiness_lb_cookie duration) for app initialization
-    fargateService.targetGroup.setAttribute(
-      "stickiness.lb_cookie.duration_seconds",
-      "86400"
-    );
 
     // Configure autoscaling
     const scaling = fargateService.service.autoScaleTaskCount({
