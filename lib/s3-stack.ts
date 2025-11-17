@@ -32,6 +32,19 @@ export class S3Stack extends cdk.Stack {
         },
       ],
 
+      // setup intelligent tiering
+      lifecycleRules: [
+        {
+          id: "intelligent-tiering",
+          transitions: [
+            {
+              storageClass: s3.StorageClass.INTELLIGENT_TIERING,
+              transitionAfter: cdk.Duration.days(30),
+            },
+          ],
+        },
+      ],
+
       removalPolicy:
         env === "prod" ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: env === "prod" ? false : true,
